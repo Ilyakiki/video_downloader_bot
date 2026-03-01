@@ -44,9 +44,9 @@ def _build_ydl_opts(output_dir: str, unique_id: str, max_height: int = 1080, sim
     }
     yt_extractor_args: dict = {
         "youtube": {
-            # mweb: работает без po_token, нет DRM
-            # android_vr: запасной, тоже без po_token для GVS
-            "player_client": ["mweb", "android_vr"],
+            # web: полные видео форматы, bgutil даёт po_token
+            # mweb: запасной для Shorts без po_token
+            "player_client": ["web", "mweb"],
         }
     }
     if POT_PROVIDER_URL:
