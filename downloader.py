@@ -42,18 +42,21 @@ def _build_ydl_opts(output_dir: str, unique_id: str, max_height: int = 1080, sim
         # Раскомментируйте, если нужны куки для Instagram/TikTok:
         # "cookiefile": "cookies.txt",
     }
-    if POT_PROVIDER_URL:
-        base["extractor_args"] = {
-            "youtubepot-bgutilhttp": {
-                "base_url": [POT_PROVIDER_URL],
-            }
+    yt_extractor_args: dict = {
+        "youtube": {
+            # ios отдаёт нормальный mp4 без cookies/po_token; tv_embedded — запасной
+            "player_client": ["ios", "tv_embedded"],
         }
+    }
+    if POT_PROVIDER_URL:
+        yt_extractor_args["youtubepot-bgutilhttp"] = {"base_url": [POT_PROVIDER_URL]}
+    base["extractor_args"] = yt_extractor_args
     if not simple_format:
         base["format"] = (
-            f"bestvideo[ext=mp4][height<={max_height}][vcodec!=none]+bestaudio[ext=m4a]"
-            f"/bestvideo[height<={max_height}][vcodec!=none]+bestaudio"
-            f"/best[height<={max_height}][vcodec!=none]"
-            "/best[vcodec!=none]"
+            f"bestvideo[ext=mp4][height<={max_height}][vcodec!=none][ext!=mhtml]+bestaudio[ext=m4a]"
+            f"/bestvideo[height<={max_height}][vcodec!=none][ext!=mhtml]+bestaudio"
+            f"/best[height<={max_height}][vcodec!=none][ext!=mhtml]"
+            "/best[vcodec!=none][ext!=mhtml]"
         )
         base["merge_output_format"] = "mp4"
     return base
