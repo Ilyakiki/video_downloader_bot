@@ -1,0 +1,9 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+RUN npm install -g bgutil-yt-dlp-pot-provider
+
+EXPOSE 4416
+
+CMD ["node", "/usr/local/lib/node_modules/bgutil-yt-dlp-pot-provider/build/server.js"]

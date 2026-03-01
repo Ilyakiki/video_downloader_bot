@@ -8,7 +8,7 @@ from typing import Optional
 
 import yt_dlp
 
-from config import DOWNLOADS_DIR, TELEGRAM_FILE_LIMIT_BYTES
+from config import DOWNLOADS_DIR, TELEGRAM_FILE_LIMIT_BYTES, POT_PROVIDER_URL
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +25,13 @@ class DownloadResult:
     webpage_url: str = ""
 
 
-def _build_ydl_opts(output_dir: str, unique_id: str) -> dict:
+QUALITY_OPTIONS = [1080, 720, 480, 360]
+
+
+def _build_ydl_opts(output_dir: str, unique_id: str, max_height: int = 1080, simple_format: bool = False) -> dict:
     output_template = os.path.join(output_dir, f"{unique_id}_%(title).50s.%(ext)s")
-    return {
-        "format": (
-            "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]"
-            "/bestvideo[height<=1080]+bestaudio"
-            "/best[height<=1080]"
-            "/best"
-        ),
+    base = {
         "outtmpl": output_template,
-        "merge_output_format": "mp4",
         "noplaylist": True,
         "quiet": True,
         "no_warnings": False,
@@ -46,12 +42,29 @@ def _build_ydl_opts(output_dir: str, unique_id: str) -> dict:
         # Раскомментируйте, если нужны куки для Instagram/TikTok:
         # "cookiefile": "cookies.txt",
     }
+    if POT_PROVIDER_URL:
+        base["extractor_args"] = {
+            "youtubepot-bgutilhttp": {
+                "base_url": [POT_PROVIDER_URL],
+            }
+        }
+    if simple_format:
+        base["format"] = "best"
+    else:
+        base["format"] = (
+            f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]"
+            f"/bestvideo[height<={max_height}]+bestaudio"
+            f"/best[height<={max_height}]"
+            "/best"
+        )
+        base["merge_output_format"] = "mp4"
+    return base
 
 
-async def download_video(url: str) -> DownloadResult:
+async def download_video(url: str, max_height: int = 1080, simple_format: bool = False) -> DownloadResult:
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     unique_id = uuid.uuid4().hex[:8]
-    opts = _build_ydl_opts(DOWNLOADS_DIR, unique_id)
+    opts = _build_ydl_opts(DOWNLOADS_DIR, unique_id, max_height=max_height, simple_format=simple_format)
 
     def _run_download() -> DownloadResult:
         try:

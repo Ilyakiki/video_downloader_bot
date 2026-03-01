@@ -1,13 +1,15 @@
 import logging
 import sys
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 import config
 from handlers import (
     start_command,
     help_command,
     handle_url_message,
+    handle_quality_callback,
     global_error_handler,
+    CALLBACK_PREFIX,
 )
 
 
@@ -34,6 +36,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url_message))
+    app.add_handler(CallbackQueryHandler(handle_quality_callback, pattern=f"^{CALLBACK_PREFIX}"))
     app.add_error_handler(global_error_handler)
 
     return app

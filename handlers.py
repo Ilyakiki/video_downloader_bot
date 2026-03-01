@@ -1,23 +1,41 @@
 import logging
-from telegram import Update
+import uuid
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
 from telegram.error import TelegramError
 
-from downloader import download_video, cleanup_file
-from utils import extract_url, is_supported_url, human_readable_size
+from downloader import download_video, cleanup_file, QUALITY_OPTIONS
+from utils import extract_url, is_supported_url, is_youtube_url, human_readable_size
 
 logger = logging.getLogger(__name__)
+
+CALLBACK_PREFIX = "quality:"
+_URL_STORE_KEY = "pending_urls"
+
+
+def _store_url(context: ContextTypes.DEFAULT_TYPE, url: str) -> str:
+    """Save URL in bot_data and return a short key."""
+    store = context.bot_data.setdefault(_URL_STORE_KEY, {})
+    key = uuid.uuid4().hex[:12]
+    store[key] = url
+    return key
+
+
+def _pop_url(context: ContextTypes.DEFAULT_TYPE, key: str) -> str | None:
+    store = context.bot_data.get(_URL_STORE_KEY, {})
+    return store.pop(key, None)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Привет! Я умею скачивать видео с YouTube, TikTok и Instagram.\n\n"
+        "Привет! Я умею скачивать видео с YouTube, TikTok, Instagram и Pinterest.\n\n"
         "Просто пришли мне ссылку — и я отправлю видео прямо в этот чат.\n\n"
         "Поддерживаемые платформы:\n"
-        "  YouTube (видео и Shorts)\n"
+        "  YouTube (видео и Shorts) — можно выбрать качество\n"
         "  TikTok\n"
-        "  Instagram (Reels, посты, IGTV)\n\n"
+        "  Instagram (Reels, посты, IGTV)\n"
+        "  Pinterest\n\n"
         "Максимальный размер файла: 50 МБ."
     )
 
@@ -33,21 +51,45 @@ async def handle_url_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     url = extract_url(text)
     if not url:
         await message.reply_text(
-            "Пожалуйста, пришли корректную ссылку с YouTube, TikTok или Instagram."
+            "Пожалуйста, пришли корректную ссылку с YouTube, TikTok, Instagram или Pinterest."
         )
         return
 
     if not is_supported_url(url):
         await message.reply_text(
             "Эта ссылка не относится к поддерживаемым платформам.\n"
-            "Поддерживаются: YouTube, TikTok, Instagram."
+            "Поддерживаются: YouTube, TikTok, Instagram, Pinterest."
         )
         return
 
-    status_msg = await message.reply_text("Скачиваю видео, подожди немного...")
-    await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.UPLOAD_VIDEO)
+    if is_youtube_url(url):
+        url_key = _store_url(context, url)
+        keyboard = [
+            [InlineKeyboardButton(f"{q}p", callback_data=f"{CALLBACK_PREFIX}{q}:{url_key}")]
+            for q in QUALITY_OPTIONS
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await message.reply_text("Выбери качество видео:", reply_markup=reply_markup)
+    else:
+        await _download_and_send(message, context, url, max_height=1080, simple_format=True)
 
-    result = await download_video(url)
+
+async def _download_and_send(
+    reply_target,
+    context: ContextTypes.DEFAULT_TYPE,
+    url: str,
+    max_height: int = 1080,
+    simple_format: bool = False,
+    status_msg=None,
+) -> None:
+    """Download a video and send it. reply_target is a Message object."""
+    chat_id = reply_target.chat_id
+
+    if status_msg is None:
+        status_msg = await reply_target.reply_text("Скачиваю видео, подожди немного...")
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_VIDEO)
+
+    result = await download_video(url, max_height=max_height, simple_format=simple_format)
 
     if not result.success:
         user_facing_error = _classify_error(result.error_message)
@@ -65,11 +107,11 @@ async def handle_url_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     await status_msg.edit_text("Загружаю в Telegram...")
-    await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.UPLOAD_VIDEO)
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_VIDEO)
 
     try:
         with result.file_path.open("rb") as video_file:
-            await message.reply_video(
+            await reply_target.reply_video(
                 video=video_file,
                 caption=result.title,
                 duration=result.duration_seconds or None,
@@ -89,9 +131,40 @@ async def handle_url_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await cleanup_file(result.file_path)
 
 
+async def handle_quality_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data or ""
+    if not data.startswith(CALLBACK_PREFIX):
+        return
+
+    payload = data[len(CALLBACK_PREFIX):]
+    sep = payload.index(":")
+    max_height = int(payload[:sep])
+    url_key = payload[sep + 1:]
+
+    url = _pop_url(context, url_key)
+    if not url:
+        await query.edit_message_text("Ссылка устарела, пришли видео ещё раз.")
+        return
+
+    status_msg = await query.edit_message_text(f"Скачиваю видео в {max_height}p, подожди немного...")
+    await _download_and_send(
+        query.message,
+        context,
+        url,
+        max_height=max_height,
+        simple_format=False,
+        status_msg=status_msg,
+    )
+
+
 def _classify_error(error_message: str) -> str:
     msg = error_message.lower()
 
+    if "sign in to confirm" in msg or "confirm you're not a bot" in msg:
+        return "YouTube требует подтверждения. Необходимо настроить cookies для бота."
     if "private" in msg or "login required" in msg or "age" in msg:
         return "Видео приватное или требует авторизации."
     if "not available" in msg or "unavailable" in msg:

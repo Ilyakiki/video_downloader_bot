@@ -1,8 +1,18 @@
 services:
+  bgutil-pot:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    restart: unless-stopped
+    expose:
+      - "4416"
+
   bot:
     build: .
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      POT_PROVIDER_URL: http://bgutil-pot:4416
     volumes:
       - ./downloads:/app/downloads
+    depends_on:
+      - bgutil-pot

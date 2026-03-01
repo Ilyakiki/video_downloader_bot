@@ -11,7 +11,15 @@ SUPPORTED_DOMAINS = {
     "instagram": re.compile(
         r"(https?://)?(www\.)?instagram\.com/(p|reel|tv)/"
     ),
+    "pinterest": re.compile(
+        r"(https?://)?(www\.|[a-z]{2}\.)?pinterest\.(com|ru|fr|de|co\.uk|it|es|pt|jp|se|dk|no|nz|au|ca|at|ch|be|mx|br|ar|cl|co|in|id|ph|sg|th|vn|za|ie|nl|pl|hu|ro|gr|cz|sk|bg|hr|si|lt|lv|ee)/pin/"
+        r"|(https?://)?pin\.it/"
+    ),
 }
+
+
+def is_youtube_url(url: str) -> bool:
+    return bool(SUPPORTED_DOMAINS["youtube"].search(url))
 
 
 def extract_url(text: str) -> str | None:
