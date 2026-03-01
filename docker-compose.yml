@@ -2,6 +2,7 @@ services:
   bgutil-pot:
     image: brainicism/bgutil-ytdlp-pot-provider:latest
     restart: unless-stopped
+    init: true
     expose:
       - "4416"
 
