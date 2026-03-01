@@ -18,8 +18,15 @@ SUPPORTED_DOMAINS = {
 }
 
 
+_YOUTUBE_SHORTS_RE = re.compile(r"(https?://)?(www\.)?youtube\.com/shorts/")
+
+
 def is_youtube_url(url: str) -> bool:
     return bool(SUPPORTED_DOMAINS["youtube"].search(url))
+
+
+def is_youtube_shorts_url(url: str) -> bool:
+    return bool(_YOUTUBE_SHORTS_RE.search(url))
 
 
 def extract_url(text: str) -> str | None:

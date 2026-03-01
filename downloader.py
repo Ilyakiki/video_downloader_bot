@@ -48,14 +48,12 @@ def _build_ydl_opts(output_dir: str, unique_id: str, max_height: int = 1080, sim
                 "base_url": [POT_PROVIDER_URL],
             }
         }
-    if simple_format:
-        base["format"] = "best"
-    else:
+    if not simple_format:
         base["format"] = (
-            f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]"
-            f"/bestvideo[height<={max_height}]+bestaudio"
-            f"/best[height<={max_height}]"
-            "/best"
+            f"bestvideo[ext=mp4][height<={max_height}][vcodec!=none]+bestaudio[ext=m4a]"
+            f"/bestvideo[height<={max_height}][vcodec!=none]+bestaudio"
+            f"/best[height<={max_height}][vcodec!=none]"
+            "/best[vcodec!=none]"
         )
         base["merge_output_format"] = "mp4"
     return base
