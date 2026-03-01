@@ -32,7 +32,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "Привет! Я умею скачивать видео с YouTube, TikTok, Instagram и Pinterest.\n\n"
         "Просто пришли мне ссылку — и я отправлю видео прямо в этот чат.\n\n"
         "Поддерживаемые платформы:\n"
-        "  YouTube (видео — можно выбрать качество, Shorts — авто)\n"
+        "  YouTube Shorts\n"
         "  TikTok\n"
         "  Instagram (Reels, посты, IGTV)\n"
         "  Pinterest\n\n"
@@ -63,13 +63,11 @@ async def handle_url_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     if is_youtube_url(url) and not is_youtube_shorts_url(url):
-        url_key = _store_url(context, url)
-        keyboard = [
-            [InlineKeyboardButton(f"{q}p", callback_data=f"{CALLBACK_PREFIX}{q}:{url_key}")]
-            for q in QUALITY_OPTIONS
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await message.reply_text("Выбери качество видео:", reply_markup=reply_markup)
+        await message.reply_text(
+            "Скачивание обычных YouTube-видео временно недоступно.\n"
+            "Работают: YouTube Shorts, TikTok, Instagram, Pinterest."
+        )
+        return
     else:
         await _download_and_send(message, context, url, max_height=1080, simple_format=False)
 
