@@ -44,8 +44,8 @@ def _build_ydl_opts(output_dir: str, unique_id: str, max_height: int = 1080, sim
     }
     yt_extractor_args: dict = {
         "youtube": {
-            # ios отдаёт нормальный mp4 без cookies/po_token; tv_embedded — запасной
-            "player_client": ["ios", "tv_embedded"],
+            # tv и mweb не требуют PO token для GVS; tv_simply — запасной
+            "player_client": ["tv", "mweb", "tv_simply"],
         }
     }
     if POT_PROVIDER_URL:
